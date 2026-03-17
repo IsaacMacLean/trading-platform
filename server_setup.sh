@@ -28,7 +28,7 @@ if [ -d "trading-platform" ]; then
     cd trading-platform
     git pull
 else
-    git clone https://github.com/YOUR_USERNAME/trading-platform.git
+    git clone https://github.com/IsaacMacLean/trading-platform.git
     cd trading-platform
 fi
 
