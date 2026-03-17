@@ -33,7 +33,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Launch trading dashboard")
     parser.add_argument("--port", type=int, default=config.DASHBOARD_PORT,
                         help=f"Port to listen on (default: {config.DASHBOARD_PORT})")
-    parser.add_argument("--host", type=str, default="127.0.0.1",
+    parser.add_argument("--host", type=str, default="0.0.0.0",
                         help="Host to bind (default: 127.0.0.1)")
     parser.add_argument("--no-monitor", action="store_true",
                         help="Skip starting the position monitor thread")
