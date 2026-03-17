@@ -1,0 +1,13 @@
+.env
+trades.db
+logs/*.log
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/

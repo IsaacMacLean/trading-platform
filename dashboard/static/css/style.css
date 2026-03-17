@@ -1,0 +1,108 @@
+/* War-room backup styles — supplemental to inline styles in index.html */
+
+:root {
+  --bg:       #0a0a0f;
+  --bg2:      #0f0f1a;
+  --bg3:      #14142b;
+  --profit:   #00ff88;
+  --loss:     #ff3366;
+  --text:     #8892a0;
+  --accent:   #00aaff;
+  --warn:     #ffaa00;
+  --border:   #1a1a2e;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Courier New', 'Lucida Console', monospace;
+}
+
+.profit { color: var(--profit) !important; }
+.loss   { color: var(--loss) !important; }
+.accent { color: var(--accent) !important; }
+.warn   { color: var(--warn) !important; }
+
+.glow-profit { text-shadow: 0 0 8px var(--profit); }
+.glow-loss   { text-shadow: 0 0 8px var(--loss); }
+.glow-accent { text-shadow: 0 0 8px var(--accent); }
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border: 1px solid currentColor;
+}
+
+.badge-profit { color: var(--profit); background: rgba(0,255,136,0.1); }
+.badge-loss   { color: var(--loss);   background: rgba(255,51,102,0.1); }
+.badge-accent { color: var(--accent); background: rgba(0,170,255,0.1); }
+.badge-warn   { color: var(--warn);   background: rgba(255,170,0,0.1); }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+th {
+  color: var(--accent);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+  text-align: right;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+th:first-child { text-align: left; }
+
+td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+
+td:first-child { text-align: left; }
+
+tr:hover { filter: brightness(1.15); }
+
+.panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.panel-header {
+  padding: 6px 12px;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+.blink { animation: blink 1s infinite; }

@@ -1,0 +1,83 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Alpaca credentials
+ALPACA_API_KEY = os.getenv("ALPACA_API_KEY")
+ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
+ALPACA_BASE_URL = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+
+# Scanner settings
+SCANNER_MIN_GAP_PCT = 3.0
+SCANNER_MIN_RVOL = 3.0
+SCANNER_MIN_PRICE = 5.0
+SCANNER_MAX_PRICE = 200.0
+SCANNER_MIN_AVG_VOLUME = 1_000_000
+
+# Risk limits
+MAX_POSITION_PCT = 0.25
+MAX_SIMULTANEOUS_POSITIONS = 5
+MAX_TOTAL_EXPOSURE = 1.00
+DAILY_LOSS_LIMIT = -0.05
+PER_TRADE_RISK = 0.02
+CIRCUIT_BREAKER_PCT = -0.15
+PROFIT_LOCK_THRESHOLD = 0.03
+
+# Execution
+MARKET_ORDER_STRATEGIES = ["momentum_surge", "news_momentum", "opening_range"]
+LIMIT_ORDER_STRATEGIES = ["gap_fade", "vwap_bounce"]
+LIMIT_ORDER_TIMEOUT_SEC = 30
+OVERNIGHT_MAX_POSITIONS = 2
+OVERNIGHT_MAX_EXPOSURE = 0.50
+
+# Backtesting
+BACKTEST_DAYS = 30
+INTRADAY_BAR_SIZE = "1Min"
+SLIPPAGE_LIQUID = 0.0005
+SLIPPAGE_ILLIQUID = 0.0015
+
+# Scheduling (Eastern Time)
+PREMARKET_SCAN_TIME = "07:00"
+FINAL_SCAN_TIME = "09:25"
+MARKET_OPEN = "09:30"
+FIRST_TRADE_TIME = "09:45"
+OVERNIGHT_SCAN_TIME = "15:30"
+CLOSE_INTRADAY_TIME = "15:55"
+MARKET_CLOSE = "16:00"
+
+# Dashboard
+DASHBOARD_PORT = 8050
+REFRESH_INTERVAL_SEC = 10
+
+# Sizing
+KELLY_FRACTION = 0.5
+SCALE_IN_INITIAL = 0.60
+SCALE_IN_ADD = 0.40
+SCALE_IN_THRESHOLD = 0.01
+
+# Legacy / strategy parameters
+EMA_FAST = 9
+EMA_SLOW = 21
+RSI_PERIOD = 14
+RSI_THRESHOLD = 50
+ATR_PERIOD = 14
+ATR_MULTIPLIER = 2.0
+
+# Legacy compat
+MAX_POSITIONS = MAX_SIMULTANEOUS_POSITIONS
+RISK_PER_TRADE = PER_TRADE_RISK
+
+# Schedule (legacy)
+SCAN_HOUR = 9
+SCAN_MINUTE = 35
+EOD_HOUR = 15
+EOD_MINUTE = 45
+
+# Universe (legacy small list — full list in data/universe.py)
+UNIVERSE = [
+    "SPY", "QQQ", "IWM",
+    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META",
+    "JPM", "GS", "BAC",
+    "XLE", "XLF", "XLK", "XLV",
+]
