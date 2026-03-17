@@ -14,7 +14,10 @@ echo ""
 # --- System packages ---
 echo "[1/6] Installing system packages..."
 sudo apt-get update -qq
-sudo apt-get install -y python3 python3-pip python3-venv git curl tzdata
+sudo apt-get install -y software-properties-common git curl tzdata -qq
+sudo add-apt-repository -y ppa:deadsnakes/ppa
+sudo apt-get update -qq
+sudo apt-get install -y python3.12 python3.12-venv python3.12-dev -qq
 
 # Set timezone to ET
 sudo timedatectl set-timezone America/New_York
@@ -43,7 +46,7 @@ echo "  .env written."
 
 # --- Python venv + deps ---
 echo "[4/6] Installing Python dependencies..."
-python3 -m venv venv
+python3.12 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip -q
 pip install -r requirements.txt -q
@@ -61,7 +64,7 @@ Wants=network-online.target
 User=ubuntu
 WorkingDirectory=/home/ubuntu/trading-platform
 EnvironmentFile=/home/ubuntu/trading-platform/.env
-ExecStart=/home/ubuntu/trading-platform/venv/bin/python main.py
+ExecStart=/home/ubuntu/trading-platform/venv/bin/python3 main.py
 Restart=always
 RestartSec=15
 StandardOutput=journal
@@ -82,7 +85,7 @@ Wants=network-online.target
 User=ubuntu
 WorkingDirectory=/home/ubuntu/trading-platform
 EnvironmentFile=/home/ubuntu/trading-platform/.env
-ExecStart=/home/ubuntu/trading-platform/venv/bin/python run_dashboard.py
+ExecStart=/home/ubuntu/trading-platform/venv/bin/python3 run_dashboard.py
 Restart=always
 RestartSec=15
 StandardOutput=journal
