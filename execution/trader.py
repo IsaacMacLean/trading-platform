@@ -262,6 +262,27 @@ class Trader:
         except Exception as exc:
             logger.error(f"sync_positions_from_broker: {exc}")
 
+    def partial_close(self, symbol: str, qty: int, reason: str = "scale_out") -> bool:
+        """
+        Close `qty` shares of an existing position.
+        Used for scaling out at 1R — take half off, let rest run.
+        """
+        try:
+            from alpaca.trading.requests import ClosePositionRequest
+            req = ClosePositionRequest(qty=str(qty))
+            self.client.close_position(symbol_or_asset_id=symbol, close_options=req)
+            if symbol in self._open_positions:
+                remaining = max(0, self._open_positions[symbol]["qty"] - qty)
+                if remaining == 0:
+                    self._open_positions.pop(symbol)
+                else:
+                    self._open_positions[symbol]["qty"] = remaining
+            logger.info(f"PARTIAL CLOSE {symbol} x{qty} reason={reason}")
+            return True
+        except Exception as exc:
+            logger.error(f"partial_close {symbol}: {exc}")
+            return False
+
     def close_all_positions(self) -> None:
         """Emergency: close all open positions."""
         logger.warning("CLOSING ALL POSITIONS")

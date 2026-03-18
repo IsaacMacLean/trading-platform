@@ -56,6 +56,8 @@ class Monitor:
 
         # Track running highs/lows for trailing stops
         self._running_highs: Dict[str, float] = {}
+        # Track which positions have already been scaled out (don't double-scale)
+        self._scaled_out: Dict[str, bool] = {}
 
     # ------------------------------------------------------------------
     # State access (thread-safe)
@@ -145,13 +147,16 @@ class Monitor:
                     "target_price": 0.0,
                 })
 
-            # Check stop-loss hits using internal trader's positions if available
+            # Check stop-loss hits, scale-outs, and time stops
             if self.trader:
                 trader_positions = self.trader.get_open_positions()
                 to_close = self.stop_manager.check_stops(trader_positions, current_prices)
                 for sym in to_close:
                     logger.warning(f"Monitor: stop hit for {sym}, closing")
                     self.trader.exit_position(sym, reason="stop")
+                    self._scaled_out.pop(sym, None)
+
+                self._check_scale_out_and_time_stops(trader_positions, current_prices)
 
             # Risk metrics
             day_high = max((p["pnl_pct"] for p in positions_list), default=0.0)
@@ -206,6 +211,77 @@ class Monitor:
 
         except Exception as exc:
             logger.error(f"Monitor._check_once: {exc}")
+
+    def _check_scale_out_and_time_stops(
+        self, trader_positions: Dict, current_prices: Dict
+    ) -> None:
+        """
+        Scale out at 1R: when profit equals the original stop distance, close half.
+        Time stop: if position is flat (<0.3% profit) after 60 min, close it.
+        Both rules together: bank gains early, don't hold dead weight.
+        """
+        now_et = datetime.now(ET)
+        for symbol, pos in list(trader_positions.items()):
+            try:
+                direction = pos.get("direction", "long")
+                entry = pos.get("entry_price", 0.0)
+                stop = pos.get("stop_price", 0.0)
+                qty = pos.get("qty", 0)
+                entry_time_str = pos.get("entry_time", "")
+                current = current_prices.get(symbol, entry)
+
+                if entry <= 0 or stop <= 0 or qty < 1:
+                    continue
+
+                # Risk per share (1R)
+                if direction == "long":
+                    risk_per_share = entry - stop
+                    profit_per_share = current - entry
+                else:
+                    risk_per_share = stop - entry
+                    profit_per_share = entry - current
+
+                if risk_per_share <= 0:
+                    continue
+
+                # ── Scale out at 1R ──────────────────────────────────────
+                # When profit >= stop distance, take half off the table.
+                # The remaining half runs with a breakeven stop (handled by trailing stop logic).
+                if not self._scaled_out.get(symbol, False):
+                    if profit_per_share >= risk_per_share and qty >= 2:
+                        half = max(1, qty // 2)
+                        logger.info(
+                            f"Scale-out at 1R: {symbol} +{profit_per_share/entry*100:.2f}% "
+                            f"closing {half}/{qty} shares"
+                        )
+                        if self.trader.partial_close(symbol, half, reason="scale_1r"):
+                            self._scaled_out[symbol] = True
+
+                # ── Time stop ────────────────────────────────────────────
+                # If position has been open 60+ min and is barely in profit, exit.
+                # Dead money costs opportunity and often reverses.
+                if entry_time_str:
+                    try:
+                        entry_dt = datetime.fromisoformat(
+                            entry_time_str.replace("Z", "+00:00")
+                        )
+                        if entry_dt.tzinfo is None:
+                            entry_dt = ET.localize(entry_dt)
+                        mins_open = (now_et - entry_dt).total_seconds() / 60
+                        profit_pct = profit_per_share / entry * 100
+
+                        if mins_open >= 60 and profit_pct < 0.3:
+                            logger.info(
+                                f"Time stop: {symbol} open {mins_open:.0f}m, "
+                                f"profit {profit_pct:.2f}% — exiting dead position"
+                            )
+                            self.trader.exit_position(symbol, reason="time_stop")
+                            self._scaled_out.pop(symbol, None)
+                    except Exception as exc:
+                        logger.debug(f"Time stop parse {symbol}: {exc}")
+
+            except Exception as exc:
+                logger.warning(f"_check_scale_out_and_time_stops {symbol}: {exc}")
 
     def _run_loop(self) -> None:
         """Background monitoring loop."""

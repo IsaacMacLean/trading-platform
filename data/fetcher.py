@@ -42,6 +42,8 @@ class AlpacaFetcher:
     def __init__(self):
         self.trading_client = TradingClient(ALPACA_API_KEY, ALPACA_SECRET_KEY, paper=True)
         self.data_client = StockHistoricalDataClient(ALPACA_API_KEY, ALPACA_SECRET_KEY)
+        # Cache daily EMA results for 2 hours — daily bars don't change intraday
+        self._ema_cache: Dict[str, tuple] = {}  # symbol -> (timestamp, above_ema: bool)
 
     # ------------------------------------------------------------------
     # Daily bars
@@ -140,6 +142,36 @@ class AlpacaFetcher:
     # ------------------------------------------------------------------
     # Relative volume
     # ------------------------------------------------------------------
+
+    def is_above_daily_ema(self, symbol: str, period: int = 20) -> bool:
+        """
+        Returns True if the stock's latest close is above its N-day EMA.
+        Cached per session (2-hour TTL) — daily bars don't move intraday.
+        Fail-open: returns True if data is unavailable so we don't block signals.
+        """
+        import time as _time
+        now_ts = _time.time()
+        cached = self._ema_cache.get(symbol)
+        if cached and (now_ts - cached[0]) < 7200:
+            return cached[1]
+        try:
+            import pandas_ta as ta
+            df = self.get_daily_bars(symbol, days=period + 10)
+            if df.empty or len(df) < period:
+                self._ema_cache[symbol] = (now_ts, True)
+                return True
+            ema = ta.ema(df["close"], length=period)
+            if ema is None or ema.isna().all():
+                self._ema_cache[symbol] = (now_ts, True)
+                return True
+            current = float(df["close"].iloc[-1])
+            ema_val = float(ema.iloc[-1])
+            result = current > ema_val
+            self._ema_cache[symbol] = (now_ts, result)
+            return result
+        except Exception as exc:
+            logger.warning(f"is_above_daily_ema({symbol}): {exc}")
+            return True  # fail open
 
     def get_rvol(self, symbol: str) -> float:
         """

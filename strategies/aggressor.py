@@ -47,9 +47,33 @@ class Aggressor(BaseStrategy):
         ]
         self._top_gappers: List[str] = []
 
+    def _get_etf_trend(self, etf: str, fetcher) -> str:
+        """Returns 'bull', 'bear', or 'neutral' for any ETF's day % change."""
+        try:
+            import pytz
+            from datetime import datetime
+            ET = pytz.timezone("America/New_York")
+            df = fetcher.get_minute_bars(etf, days=2)
+            if df.empty:
+                return "neutral"
+            df_et = df.copy()
+            df_et.index = df_et.index.tz_convert(ET)
+            today = datetime.now(ET).date()
+            today_df = df_et[df_et.index.date == today]
+            if len(today_df) < 2:
+                return "neutral"
+            chg = (float(today_df["close"].iloc[-1]) - float(today_df["open"].iloc[0])) / float(today_df["open"].iloc[0])
+            if chg > config.SPY_BULL_THRESHOLD:
+                return "bull"
+            elif chg < config.SPY_BEAR_THRESHOLD:
+                return "bear"
+            return "neutral"
+        except Exception as exc:
+            logger.warning(f"ETF trend {etf}: {exc}")
+            return "neutral"
+
     def _get_spy_trend(self, fetcher) -> str:
-        """
-        Returns 'bull', 'bear', or 'neutral' based on SPY's day % change.
+        """Returns 'bull', 'bear', or 'neutral' based on SPY's day % change.
         Used to filter signals that go against the broad market.
         """
         try:
@@ -90,6 +114,17 @@ class Aggressor(BaseStrategy):
         if config.SPY_TREND_FILTER:
             spy_trend = self._get_spy_trend(fetcher)
             logger.info(f"SPY regime: {spy_trend}")
+
+        # Cache sector ETF trends for this cycle (avoids N fetches per signal)
+        from data.universe import SECTOR_ETF
+        sector_cache: dict = {}
+        def get_sector_trend(sym: str) -> str:
+            etf = SECTOR_ETF.get(sym)
+            if not etf:
+                return spy_trend  # fall back to SPY if no sector mapped
+            if etf not in sector_cache:
+                sector_cache[etf] = self._get_etf_trend(etf, fetcher)
+            return sector_cache[etf]
 
         # Collect raw signals from each sub-strategy
         raw: Dict[str, List[Signal]] = defaultdict(list)
@@ -144,11 +179,23 @@ class Aggressor(BaseStrategy):
             if symbol in self._top_gappers:
                 total_conviction += 1
 
-            # SPY regime: penalise signals that fight the broad market
+            # Daily trend filter: skip longs below 20-day EMA (buying downtrends)
+            if direction == "long" and not fetcher.is_above_daily_ema(symbol):
+                logger.debug(f"Skipping {symbol} long: below 20-day EMA")
+                continue
+
+            # Sector confirmation: penalise signals fighting their sector
+            sec_trend = get_sector_trend(symbol)
+            if sec_trend == "bull" and direction == "short":
+                total_conviction -= 1
+            elif sec_trend == "bear" and direction == "long":
+                total_conviction -= 1
+
+            # SPY regime: additional penalty for fighting the broad market
             if spy_trend == "bull" and direction == "short":
-                total_conviction -= 2  # shorting into bull tape is dangerous
+                total_conviction -= 2
             elif spy_trend == "bear" and direction == "long":
-                total_conviction -= 2  # buying into sell-off is dangerous
+                total_conviction -= 2
 
             # Skip low-conviction signals
             if total_conviction < MIN_CONVICTION:

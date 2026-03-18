@@ -3,7 +3,7 @@ Universe — base list of ~200 liquid US stocks + ETFs.
 """
 from __future__ import annotations
 
-from typing import List
+from typing import Dict, List
 
 # ---------------------------------------------------------------------------
 # Base universe: S&P 500 majors, sector ETFs, popular momentum names
@@ -80,6 +80,47 @@ for _s in BASE_UNIVERSE:
         _deduped.append(_s)
         _seen.add(_s)
 BASE_UNIVERSE = _deduped
+
+
+# ---------------------------------------------------------------------------
+# Sector ETF map — used by aggressor to confirm sector is aligned before entry
+# ---------------------------------------------------------------------------
+
+SECTOR_ETF: Dict[str, str] = {
+    # Technology
+    "AAPL":"XLK","MSFT":"XLK","NVDA":"XLK","AMD":"XLK","INTC":"XLK",
+    "AVGO":"XLK","QCOM":"XLK","TXN":"XLK","CRM":"XLK","ADBE":"XLK",
+    "ORCL":"XLK","MU":"XLK","AMAT":"XLK","LRCX":"XLK","KLAC":"XLK",
+    "MRVL":"XLK","PANW":"XLK","CRWD":"XLK","FTNT":"XLK","SNOW":"XLK",
+    "PLTR":"XLK","NET":"XLK","DDOG":"XLK","ZS":"XLK","OKTA":"XLK",
+    "SMCI":"XLK","ARM":"XLK","SQ":"XLK","PYPL":"XLK","SHOP":"XLK",
+    # Financial
+    "JPM":"XLF","BAC":"XLF","WFC":"XLF","GS":"XLF","MS":"XLF",
+    "C":"XLF","BLK":"XLF","SCHW":"XLF","AXP":"XLF","COF":"XLF",
+    "USB":"XLF","PNC":"XLF","V":"XLF","MA":"XLF","COIN":"XLF",
+    # Healthcare
+    "JNJ":"XLV","UNH":"XLV","PFE":"XLV","ABBV":"XLV","MRK":"XLV",
+    "LLY":"XLV","BMY":"XLV","GILD":"XLV","AMGN":"XLV","BIIB":"XLV",
+    "REGN":"XLV","VRTX":"XLV","MRNA":"XLV","ISRG":"XLV","ILMN":"XLV",
+    # Energy
+    "XOM":"XLE","CVX":"XLE","COP":"XLE","EOG":"XLE","SLB":"XLE",
+    "HAL":"XLE","DVN":"XLE","OXY":"XLE","MPC":"XLE","VLO":"XLE",
+    # Consumer Discretionary
+    "AMZN":"XLY","TSLA":"XLY","HD":"XLY","NKE":"XLY","MCD":"XLY",
+    "SBUX":"XLY","CMG":"XLY","TGT":"XLY","LOW":"XLY","DKNG":"XLY",
+    "WYNN":"XLY","MGM":"XLY","LVS":"XLY","UBER":"XLY","ABNB":"XLY",
+    # Consumer Staples
+    "WMT":"XLP","COST":"XLP",
+    # Industrials
+    "BA":"XLI","GE":"XLI","HON":"XLI","CAT":"XLI","DE":"XLI",
+    "UPS":"XLI","FDX":"XLI","LMT":"XLI","RTX":"XLI","NOC":"XLI","GD":"XLI",
+    # Communication
+    "GOOGL":"XLC","GOOG":"XLC","META":"XLC","NFLX":"XLC",
+    "DIS":"XLC","CMCSA":"XLC","T":"XLC","VZ":"XLC","SNAP":"XLC",
+    # Crypto / speculative — use QQQ as proxy
+    "MSTR":"QQQ","RIOT":"QQQ","MARA":"QQQ","HOOD":"QQQ","SOFI":"QQQ",
+    "UPST":"QQQ","AFRM":"QQQ","RBLX":"QQQ","DASH":"QQQ",
+}
 
 
 def get_tradeable_universe(
