@@ -224,6 +224,17 @@ def _run_aggressor_cycle(overnight_only: bool = False) -> None:
             logger.debug("Cannot open new positions (max reached or halted)")
             return
 
+        # Enforce overnight position limit
+        if overnight_only:
+            overnight_count = sum(
+                1 for p in positions.values() if p.get("strategy") == "overnight_swing"
+            )
+            if overnight_count >= config.OVERNIGHT_MAX_POSITIONS:
+                logger.info(
+                    f"Overnight limit reached ({overnight_count}/{config.OVERNIGHT_MAX_POSITIONS})"
+                )
+                return
+
         # Get watchlist
         universe = get_universe()
         watchlist = scanner.get_todays_watchlist(universe)
@@ -238,8 +249,13 @@ def _run_aggressor_cycle(overnight_only: bool = False) -> None:
         if not raw_signals:
             return
 
-        # Apply position sizing
-        sized_signals = aggressor.apply_position_sizing(raw_signals, equity)
+        # Size positions from REMAINING undeployed capital, not total equity.
+        # If 3 positions are already open at 20% each, only 40% of capital is free.
+        deployed = sum(
+            p.get("qty", 0) * p.get("entry_price", 0) for p in positions.values()
+        )
+        available_equity = max(equity * 0.10, equity - deployed)  # keep at least 10% floor
+        sized_signals = aggressor.apply_position_sizing(raw_signals, available_equity)
 
         # Execute top signals
         for sig in sized_signals:

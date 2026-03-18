@@ -13,7 +13,7 @@ import pytz
 from loguru import logger
 
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest
+from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest, StopOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
 from alpaca.data.historical import StockHistoricalDataClient
 
@@ -76,6 +76,29 @@ class Trader:
         )
         return self.client.submit_order(order_data=req)
 
+    def _place_broker_stop(
+        self, symbol: str, qty: int, direction: str, stop_price: float
+    ) -> Optional[str]:
+        """
+        Place a GTC stop-loss order directly on Alpaca.
+        Survives bot crashes — the broker will execute it regardless of bot state.
+        """
+        try:
+            side = OrderSide.SELL if direction == "long" else OrderSide.BUY
+            req = StopOrderRequest(
+                symbol=symbol,
+                qty=qty,
+                side=side,
+                stop_price=round(stop_price, 2),
+                time_in_force=TimeInForce.GTC,
+            )
+            order = self.client.submit_order(order_data=req)
+            logger.info(f"Broker stop placed: {symbol} {side.value} x{qty} @ ${stop_price:.2f}")
+            return str(order.id)
+        except Exception as exc:
+            logger.warning(f"_place_broker_stop {symbol}: {exc} — using software stop only")
+            return None
+
     def _submit_limit_order(self, symbol: str, qty: int, side: OrderSide, limit_price: float):
         """Submit a limit order."""
         req = LimitOrderRequest(
@@ -120,6 +143,9 @@ class Trader:
                 "order_id": order_id,
             }
             logger.info(f"ENTER LONG {symbol} x{qty} @ ~{signal.entry_price:.2f} [{signal.strategy}]")
+            # Place hard stop on Alpaca — survives bot restarts
+            if signal.stop_price > 0:
+                self._place_broker_stop(symbol, qty, "long", signal.stop_price)
             return order_id
 
         except Exception as exc:
@@ -154,6 +180,9 @@ class Trader:
                 "order_id": order_id,
             }
             logger.info(f"ENTER SHORT {symbol} x{qty} @ ~{signal.entry_price:.2f} [{signal.strategy}]")
+            # Place hard stop on Alpaca — survives bot restarts
+            if signal.stop_price > 0:
+                self._place_broker_stop(symbol, qty, "short", signal.stop_price)
             return order_id
 
         except Exception as exc:

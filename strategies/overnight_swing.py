@@ -15,6 +15,45 @@ from strategies.base import BaseStrategy, Signal
 from data.indicators import add_vwap, add_ema, add_rsi
 import config
 
+
+def _has_earnings_soon(symbol: str) -> bool:
+    """
+    Returns True if the stock reports earnings within the next 2 trading days.
+    Holding through earnings overnight is gambling — skip these setups.
+    """
+    try:
+        import yfinance as yf
+        from datetime import timedelta
+        ticker = yf.Ticker(symbol)
+        cal = ticker.calendar
+        if cal is None:
+            return False
+        today = datetime.now(ET).date()
+        cutoff = today + timedelta(days=2)
+        # Newer yfinance returns a dict
+        if isinstance(cal, dict):
+            dates = cal.get("Earnings Date", [])
+            for d in (dates if hasattr(dates, "__iter__") else [dates]):
+                if hasattr(d, "date"):
+                    d = d.date()
+                if today <= d <= cutoff:
+                    return True
+            return False
+        # Older yfinance returns a DataFrame
+        if hasattr(cal, "loc"):
+            try:
+                ed = cal.loc["Earnings Date"]
+                for d in (ed if hasattr(ed, "__iter__") else [ed]):
+                    if hasattr(d, "date"):
+                        d = d.date()
+                    if today <= d <= cutoff:
+                        return True
+            except Exception:
+                pass
+        return False
+    except Exception:
+        return False  # fail-safe: if we can't check, allow the trade
+
 ET = pytz.timezone("America/New_York")
 MIN_UP_PCT = 3.0
 MIN_RVOL = 3.0           # raised from 2.0 — stronger volume confirmation required
@@ -47,6 +86,11 @@ class OvernightSwing(BaseStrategy):
             rvol = item.get("rvol", 1.0)
 
             if rvol < MIN_RVOL:
+                continue
+
+            # Skip if earnings are within 2 days — overnight holds through earnings = gambling
+            if _has_earnings_soon(symbol):
+                logger.info(f"OvernightSwing {symbol}: earnings soon — skipping")
                 continue
 
             try:
