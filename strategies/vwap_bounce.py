@@ -11,11 +11,12 @@ import pytz
 from loguru import logger
 
 from strategies.base import BaseStrategy, Signal
-from data.indicators import add_vwap, add_ema
+from data.indicators import add_vwap, add_ema, add_rsi
+import config
 
 ET = pytz.timezone("America/New_York")
-ENTRY_BAND_PCT = 0.001   # 0.1% from VWAP
-STOP_THROUGH_PCT = 0.003  # 0.3% through VWAP
+ENTRY_BAND_PCT = 0.0025   # 0.25% from VWAP (was 0.1% — too tight to ever trigger)
+STOP_THROUGH_PCT = 0.004  # 0.4% through VWAP (slightly wider to avoid noise stops)
 POSITION_SIZE_PCT = 0.125  # 12.5% midpoint of 10-15%
 
 
@@ -55,6 +56,7 @@ class VWAPBounce(BaseStrategy):
 
                 today_df = add_vwap(today_df)
                 today_df = add_ema(today_df, fast=9, slow=21)
+                today_df = add_rsi(today_df, period=14)
 
                 if "vwap" not in today_df.columns or today_df["vwap"].isna().all():
                     continue
@@ -85,14 +87,21 @@ class VWAPBounce(BaseStrategy):
                 day_high = float(today_df["high"].max())
                 day_low = float(today_df["low"].min())
 
+                rsi_val = today_df["rsi"].iloc[-1] if "rsi" in today_df.columns else 50.0
+                rsi = float(rsi_val) if not pd.isna(rsi_val) else 50.0
+
                 if in_uptrend and not above_vwap:
-                    # Pullback to VWAP in uptrend — long
+                    # Pullback to VWAP in uptrend — long (skip if overbought)
+                    if rsi > config.RSI_OVERBOUGHT:
+                        continue
                     direction = "long"
                     entry = current_price
                     stop = vwap * (1 - STOP_THROUGH_PCT)
                     target = day_high
                 elif in_downtrend and above_vwap:
-                    # Rally to VWAP in downtrend — short
+                    # Rally to VWAP in downtrend — short (skip if oversold)
+                    if rsi < config.RSI_OVERSOLD:
+                        continue
                     direction = "short"
                     entry = current_price
                     stop = vwap * (1 + STOP_THROUGH_PCT)

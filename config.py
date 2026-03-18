@@ -56,6 +56,19 @@ SCALE_IN_INITIAL = 0.60
 SCALE_IN_ADD = 0.40
 SCALE_IN_THRESHOLD = 0.01
 
+# Strategy quality filters
+MIN_CONVICTION = 3          # aggressor won't trade below this score
+SPY_TREND_FILTER = True     # discount signals going against broad market
+SPY_BULL_THRESHOLD = 0.003  # SPY up >0.3% = bull; penalise shorts
+SPY_BEAR_THRESHOLD = -0.003 # SPY down >0.3% = bear; penalise longs
+RSI_OVERBOUGHT = 72         # don't enter longs above this RSI
+RSI_OVERSOLD = 28           # don't enter shorts below this RSI
+
+# Improved stop/trail parameters
+MOMENTUM_TRAIL_PCT = 0.015  # 1.5% trailing stop for momentum/news (was 0.5%)
+GAP_FADE_STOP_PCT = 0.025   # 2.5% stop for gap fade (was 2%)
+GAP_FADE_MAX_GAP = 12.0     # don't fade gaps > 12% (likely hard news)
+
 # Legacy / strategy parameters
 EMA_FAST = 9
 EMA_SLOW = 21
