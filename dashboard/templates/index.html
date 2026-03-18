@@ -141,8 +141,8 @@ body{
 
 /* ── RIGHT ── */
 #right{width:272px;flex-shrink:0;display:flex;flex-direction:column}
-#scan-s{flex:1;min-height:0;display:flex;flex-direction:column;border-bottom:1px solid var(--bd)}
-#risk-s{flex-shrink:0}
+#scan-s{flex:1;min-height:0;display:flex;flex-direction:column;border-bottom:1px solid var(--bd);min-height:0}
+#risk-s{flex-shrink:0;border-top:1px solid var(--bd)}
 
 /* shared section body */
 .sb{flex:1;overflow-y:auto;min-height:0}
@@ -467,7 +467,7 @@ function mkChart(){
         y:{
           position:'right',
           grid:{color:'rgba(255,255,255,.03)',drawBorder:false},
-          ticks:{color:'rgba(255,255,255,.2)',font:{size:9},callback:v=>'$'+v.toLocaleString()},
+          ticks:{color:'rgba(255,255,255,.2)',font:{size:9},maxTicksLimit:5,callback:v=>'$'+v.toLocaleString()},
           border:{display:false}
         }
       }
@@ -491,18 +491,19 @@ function updChart(curve,base,pnl){
   g.addColorStop(1,`rgba(${rgb},0)`);
   chart.data.datasets[0].backgroundColor=g;
   if(!curve||curve.length<2){
+    // Flat line: position near top so gradient fill looks great below it
     chart.data.labels=['Open','Now'];
     chart.data.datasets[0].data=[base,base];
-    chart.options.scales.y.min=base*.9992;
-    chart.options.scales.y.max=base*1.0008;
+    chart.options.scales.y.min=base*0.9972;  // 0.28% below → line sits at ~85% height
+    chart.options.scales.y.max=base*1.0004;  // 0.04% above → tight headroom
   } else {
     const v=curve.map(p=>p.equity);
     const lo=Math.min(...v),hi=Math.max(...v);
-    const pad=Math.max((hi-lo)*.18,base*.002);
+    const range=hi-lo||base*0.001;
     chart.data.labels=curve.map(p=>p.time);
     chart.data.datasets[0].data=v;
-    chart.options.scales.y.min=lo-pad;
-    chart.options.scales.y.max=hi+pad;
+    chart.options.scales.y.min=lo-range*.3;
+    chart.options.scales.y.max=hi+range*.08;
     $('hwm').textContent='HWM '+fmt(Math.max(...v));
   }
   chart.update('none');
@@ -620,9 +621,12 @@ function render(s){
   ri.textContent=pct(ppct);ri.className='ri-v '+(ppct>=0?'gg':'rr');
   const ex=risk.total_exposure_pct||0;
   $('r-exp').textContent=ex.toFixed(1)+'%';$('r-exp-f').style.width=Math.min(ex,100)+'%';
-  const dist=risk.distance_to_daily_limit||5;
+  // distance_to_daily_limit from API is the limit value (e.g. -5), not the actual distance
+  // actual distance = current_pnl_pct - limit (e.g. 0 - (-5) = 5)
+  const limitPct=risk.daily_loss_limit_pct||risk.distance_to_daily_limit||-5;
+  const dist=Math.max(ppct-limitPct, 0);
   const rd=$('r-dist');
-  rd.textContent=dist.toFixed(2)+'%';rd.className='ri-v '+(dist<1?'rr':'gg');
+  rd.textContent='+'+dist.toFixed(2)+'%';rd.className='ri-v '+(dist<1?'rr':dist<2?'':'gg');
   const rdf=$('r-dist-f');
   rdf.style.width=Math.min(dist/5*100,100)+'%';
   rdf.style.background=dist<1?'var(--r)':dist<2?'var(--y)':'var(--g)';
