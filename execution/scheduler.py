@@ -114,6 +114,14 @@ class Scheduler:
             replace_existing=True,
         )
 
+        # 9:45 AM — close overnight positions (next morning exit) + fire first trades
+        scheduler.add_job(
+            lambda: self._safe_call("close_overnight"),
+            CronTrigger(hour=9, minute=45, timezone=ET),
+            id="close_overnight",
+            replace_existing=True,
+        )
+
         # 9:45 AM — fire first trades (ORB + gap fade)
         scheduler.add_job(
             lambda: self._safe_call("first_trades"),

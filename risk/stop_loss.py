@@ -10,14 +10,14 @@ from loguru import logger
 
 # Per-strategy stop distances as a fraction of entry price
 STRATEGY_STOPS: Dict[str, float] = {
-    "gap_fade":       0.02,   # 2% — gap extension stop
-    "opening_range":  0.01,   # 1% — half the opening range (approx)
-    "momentum_surge": 0.005,  # 0.5% trailing
-    "vwap_bounce":    0.003,  # 0.3% through VWAP
-    "overnight_swing": 0.02,  # 2% overnight
-    "news_momentum":  0.01,   # 1% trailing
-    "aggressor":      0.015,  # 1.5% default
-    "default":        0.015,
+    "gap_fade":        0.025,  # 2.5% — matches config.GAP_FADE_STOP_PCT
+    "opening_range":   0.015,  # ATR-based in strategy; this is the software fallback
+    "momentum_surge":  0.015,  # 1.5% — matches config.MOMENTUM_TRAIL_PCT
+    "vwap_bounce":     0.004,  # 0.4% through VWAP — matches updated STOP_THROUGH_PCT
+    "overnight_swing": 0.025,  # 2.5% — more room for overnight gap noise
+    "news_momentum":   0.015,  # 1.5% — matches config.MOMENTUM_TRAIL_PCT
+    "aggressor":       0.015,  # 1.5% default
+    "default":         0.015,
 }
 
 # Trailing stop activates once position is up this much

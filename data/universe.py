@@ -51,9 +51,9 @@ BASE_UNIVERSE: List[str] = [
     # Real estate
     "AMT", "PLD", "CCI", "EQIX", "PSA", "O",
 
-    # Momentum / meme adjacent
-    "GME", "AMC", "BBBY", "SOFI", "HOOD", "COIN", "MSTR", "RIOT", "MARA",
-    "UPST", "AFRM", "OPEN", "CLOV", "SPCE",
+    # Momentum / meme adjacent (removed delisted/dead: BBBY, OPEN, CLOV, SPCE)
+    "GME", "AMC", "SOFI", "HOOD", "COIN", "MSTR", "RIOT", "MARA",
+    "UPST", "AFRM",
 
     # Semiconductors extra
     "SMCI", "ARM", "WOLF", "ON", "SWKS", "MPWR",
@@ -66,9 +66,10 @@ BASE_UNIVERSE: List[str] = [
     "TNA", "TZA", "FAS", "FAZ", "UVXY", "VXX",
 
     # Misc high-volume
+    # Removed delisted/dead: TWTR, BYND, WISH, PTON (mostly dead volume)
     "SQ", "PYPL", "V", "MA", "UBER", "LYFT", "ABNB", "DASH", "RBLX",
-    "SNAP", "PINS", "TWTR", "SHOP", "ETSY", "W",
-    "ZM", "DOCU", "PTON", "BYND", "CHWY", "WISH",
+    "SNAP", "PINS", "SHOP", "ETSY", "W",
+    "ZM", "DOCU", "CHWY",
     "NIO", "XPEV", "LI", "BIDU", "JD", "BABA",
 ]
 

@@ -58,6 +58,7 @@ SCALE_IN_THRESHOLD = 0.01
 
 # Strategy quality filters
 MIN_CONVICTION = 3          # aggressor won't trade below this score
+MAX_DAILY_TRADES = 8        # hard cap on trades per day — prevents overtrading
 SPY_TREND_FILTER = True     # discount signals going against broad market
 SPY_BULL_THRESHOLD = 0.003  # SPY up >0.3% = bull; penalise shorts
 SPY_BEAR_THRESHOLD = -0.003 # SPY down >0.3% = bear; penalise longs

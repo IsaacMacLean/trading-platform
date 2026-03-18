@@ -252,10 +252,12 @@ class Monitor:
                         half = max(1, qty // 2)
                         logger.info(
                             f"Scale-out at 1R: {symbol} +{profit_per_share/entry*100:.2f}% "
-                            f"closing {half}/{qty} shares"
+                            f"closing {half}/{qty} shares, moving stop to breakeven"
                         )
                         if self.trader.partial_close(symbol, half, reason="scale_1r"):
                             self._scaled_out[symbol] = True
+                            # Move broker stop to breakeven — remaining half now rides for free
+                            self.trader.move_stop_to_breakeven(symbol)
 
                 # ── Time stop ────────────────────────────────────────────
                 # If position has been open 60+ min and is barely in profit, exit.

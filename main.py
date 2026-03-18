@@ -46,6 +46,9 @@ from reporting.performance import generate_eod_report
 
 ET = pytz.timezone("America/New_York")
 
+# Daily trade counter — resets each morning, hard-caps overtrading
+_trades_today: int = 0
+
 # ---- Configure loguru ----
 logger.remove()
 logger.add(
@@ -90,6 +93,8 @@ def get_universe() -> List[str]:
 
 def job_premarket_scan() -> None:
     """7:00 AM — fetch pre-market data, identify gappers."""
+    global _trades_today
+    _trades_today = 0  # reset daily trade counter each morning
     logger.info("=== PRE-MARKET SCAN ===")
     universe = get_universe()
     try:
@@ -146,6 +151,19 @@ def job_intraday_scan() -> None:
         logger.error(f"job_intraday_scan: {exc}")
 
 
+def job_close_overnight() -> None:
+    """9:45 AM — close overnight swing positions (spec: open +15 min exit)."""
+    logger.info("=== CLOSING OVERNIGHT POSITIONS ===")
+    try:
+        open_positions = trader.get_open_positions()
+        for symbol, pos in list(open_positions.items()):
+            if pos.get("strategy") == "overnight_swing":
+                logger.info(f"Closing overnight position: {symbol}")
+                trader.exit_position(symbol, reason="overnight_exit")
+    except Exception as exc:
+        logger.error(f"job_close_overnight: {exc}")
+
+
 def job_overnight_scan() -> None:
     """3:30 PM — overnight swing scanner."""
     logger.info("=== OVERNIGHT SWING SCAN ===")
@@ -192,7 +210,7 @@ def job_eod_report() -> None:
 # Core trading cycle
 # ===========================================================================
 
-def _run_aggressor_cycle(overnight_only: bool = False) -> None:
+def _run_aggressor_cycle(overnight_only: bool = False) -> None:  # noqa: C901
     """
     Run the full Aggressor cycle:
     1. Get watchlist
@@ -201,13 +219,23 @@ def _run_aggressor_cycle(overnight_only: bool = False) -> None:
     4. Size positions
     5. Execute
     """
+    global _trades_today
     try:
+        # Hard cap on daily trades — prevents overtrading on noisy days
+        if _trades_today >= config.MAX_DAILY_TRADES:
+            logger.info(f"Daily trade limit reached ({_trades_today}/{config.MAX_DAILY_TRADES})")
+            return
+
         # Check risk before doing anything
         account = trader.client.get_account()
         equity = float(account.equity)
 
         if risk_manager.check_circuit_breaker(account):
-            logger.warning("Circuit breaker active — no trading")
+            logger.warning("Circuit breaker active — closing positions and cancelling all orders")
+            try:
+                trader.client.cancel_orders()  # cancel pending orders first
+            except Exception as exc:
+                logger.warning(f"cancel_orders: {exc}")
             trader.close_all_positions()
             return
 
@@ -282,6 +310,7 @@ def _run_aggressor_cycle(overnight_only: bool = False) -> None:
                 order_id = trader.enter_short(sig)
 
             if order_id:
+                _trades_today += 1
                 alerts.position_opened(sig.symbol, sig.qty, sig.entry_price, sig.strategy, sig.direction)
                 trade_logger.log_trade({
                     "symbol": sig.symbol,
@@ -357,6 +386,7 @@ def main() -> None:
     scheduler.register("premarket_scan",    job_premarket_scan)
     scheduler.register("final_scan",        job_final_scan)
     scheduler.register("opening_range_calc", job_opening_range_calc)
+    scheduler.register("close_overnight",   job_close_overnight)
     scheduler.register("first_trades",      job_first_trades)
     scheduler.register("intraday_scan",     job_intraday_scan)
     scheduler.register("overnight_scan",    job_overnight_scan)

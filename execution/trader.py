@@ -145,7 +145,9 @@ class Trader:
             logger.info(f"ENTER LONG {symbol} x{qty} @ ~{signal.entry_price:.2f} [{signal.strategy}]")
             # Place hard stop on Alpaca — survives bot restarts
             if signal.stop_price > 0:
-                self._place_broker_stop(symbol, qty, "long", signal.stop_price)
+                stop_oid = self._place_broker_stop(symbol, qty, "long", signal.stop_price)
+                if stop_oid:
+                    self._open_positions[symbol]["stop_order_id"] = stop_oid
             return order_id
 
         except Exception as exc:
@@ -182,7 +184,9 @@ class Trader:
             logger.info(f"ENTER SHORT {symbol} x{qty} @ ~{signal.entry_price:.2f} [{signal.strategy}]")
             # Place hard stop on Alpaca — survives bot restarts
             if signal.stop_price > 0:
-                self._place_broker_stop(symbol, qty, "short", signal.stop_price)
+                stop_oid = self._place_broker_stop(symbol, qty, "short", signal.stop_price)
+                if stop_oid:
+                    self._open_positions[symbol]["stop_order_id"] = stop_oid
             return order_id
 
         except Exception as exc:
@@ -192,12 +196,27 @@ class Trader:
     def exit_position(self, symbol: str, reason: str = "manual") -> bool:
         """
         Close an open position with a market order.
+        Fetches current price before closing to log a meaningful exit price.
         Returns True on success.
         """
         try:
+            # Snapshot price before close for accurate trade logging
+            exit_price = 0.0
+            try:
+                from alpaca.data.historical import StockHistoricalDataClient
+                from alpaca.data.requests import StockLatestBarRequest
+                dc = StockHistoricalDataClient(config.ALPACA_API_KEY, config.ALPACA_SECRET_KEY)
+                bar = dc.get_stock_latest_bar(StockLatestBarRequest(symbol_or_symbols=symbol))
+                b = bar.get(symbol)
+                if b:
+                    exit_price = float(b.close)
+            except Exception:
+                pass
+
             self.client.close_position(symbol)
             pos = self._open_positions.pop(symbol, {})
-            logger.info(f"EXIT {symbol} reason={reason}")
+            pos["exit_price"] = exit_price
+            logger.info(f"EXIT {symbol} @ ~{exit_price:.2f} reason={reason}")
             self._log_trade(symbol, pos, reason=reason)
             return True
         except Exception as exc:
@@ -262,6 +281,39 @@ class Trader:
         except Exception as exc:
             logger.error(f"sync_positions_from_broker: {exc}")
 
+    def move_stop_to_breakeven(self, symbol: str) -> bool:
+        """
+        Cancel the existing broker stop order and replace it with a new one at entry price.
+        Called after scale-out at 1R so the remaining half rides for free.
+        """
+        pos = self._open_positions.get(symbol)
+        if not pos:
+            return False
+        entry = pos.get("entry_price", 0.0)
+        direction = pos.get("direction", "long")
+        qty = pos.get("qty", 0)
+        old_stop_id = pos.get("stop_order_id")
+        if entry <= 0 or qty <= 0:
+            return False
+        try:
+            # Cancel old stop
+            if old_stop_id:
+                try:
+                    self.client.cancel_order_by_id(old_stop_id)
+                    logger.info(f"Cancelled old stop order {old_stop_id} for {symbol}")
+                except Exception:
+                    pass  # may already be filled/cancelled
+            # Place new stop at breakeven
+            new_stop_id = self._place_broker_stop(symbol, qty, direction, entry)
+            if new_stop_id:
+                self._open_positions[symbol]["stop_order_id"] = new_stop_id
+                self._open_positions[symbol]["stop_price"] = entry
+            logger.info(f"Stop moved to breakeven for {symbol} @ {entry:.2f}")
+            return True
+        except Exception as exc:
+            logger.error(f"move_stop_to_breakeven {symbol}: {exc}")
+            return False
+
     def partial_close(self, symbol: str, qty: int, reason: str = "scale_out") -> bool:
         """
         Close `qty` shares of an existing position.
@@ -316,6 +368,19 @@ class Trader:
                 hold_minutes = (dt_exit - dt_entry).total_seconds() / 60
             except Exception:
                 pass
+
+            # Use exit_price stored by exit_position if available
+            exit_price = pos.get("exit_price", 0.0)
+
+            # Calculate P&L if we have both prices
+            if entry_price > 0 and exit_price > 0:
+                direction = pos.get("direction", "long")
+                if direction == "long":
+                    pnl = (exit_price - entry_price) * qty
+                    pnl_pct = (exit_price - entry_price) / entry_price * 100
+                else:
+                    pnl = (entry_price - exit_price) * qty
+                    pnl_pct = (entry_price - exit_price) / entry_price * 100
 
             conn = sqlite3.connect(DB_PATH)
             conn.execute(
